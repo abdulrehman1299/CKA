@@ -110,7 +110,7 @@ For storing secrets in **base64** encoding, use command:
 ```
 echo -n 'msql' | base64
 ```
-To see the secrets in non-encrypted format:
+To see the secrets in base64 format:
 ```
 kubectl get secret <secret-name> -o yaml
 ```

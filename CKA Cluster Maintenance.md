@@ -60,3 +60,18 @@ We can use **--watch** to see live changes in results of our commands:
 ```
 kubectl get pods -n kube-system --watch 
 ```
+When ETCD is not running as a pod in cluster, then it may be configured manually on controlplane, check for system processes
+
+To check members/nodes storing ETCD, run command:
+```
+ETCDCTL_API=3 etcdctl --endpoints=<> --cacert=<> --cert=<> --key=<> \
+member list
+```
+
+**Stacked mode ETCD**,  means that ETCD is running in the same server as of other controlplane components.
+To make changes in processes, edit file of that service in:
+```
+/etc/systemd/system/<service_name>
+```
+
+___DONE WITH CLUSTER MAINTENANCE___
