@@ -289,3 +289,117 @@ kubectl create rolebinding my-rolebinding \
   --user=my-user \ 
   --namespace=my-namespace
 ```
+
+For kubernetes workloads/items, **service accounts** are used instead of **users**:
+```
+kubectl create serviceaccount <service-account name>
+```
+Service account creates a token automatically that is used for authentication with Kubernetes API. This token is stored as a **secret object** that is created simultaneously and linked with service account.
+
+To use the **token** with a curl request for authorization with Kube API:
+```
+curl https://192.168.0.1:6443/api -insecrue \
+-- header "Authorization: Bearer <token>"
+```
+Permissions can be assigned to a service account using **RBAC** mechanisms.
+
+There is always a **default** service account in every namespace. This service account and its token are automatically mounted to that pod as a volume at **/var/run/secrets/kubernetes.io/serviceaccount**.
+
+To remove this default behavior and not allow kubernetes to mount a token volume:
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-kubernetes-dashboard
+spec:
+  containers:
+    - name: my-kubernetes-dashboard
+      image: my-kubernetes-dashboard
+  automountServiceAccountToken: false
+```
+
+In version 1.24+, the token volumes now attached are of the type **projected** and they have an expiry time. Projected type means that the volume has multiple sources.
+**Plus, no tokens are now automatically created upon creation of service account.** The tokens are now sent by **TokenRequest** API.
+
+If you want to create a token for service account:
+```
+kubectl create token dashboard-sa
+
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: mysecretname
+  annotations:
+    kubernetes.io/service-account.name: dashboard-sa
+(This won't be having any expiry)
+```
+
+You shouldn't be creating any service account token unless you are unable to access **TokenRequest API**.
+
+To access a **private docker registry**, we use:
+```
+kubectl create secret docker-registry regcred \
+	--docker-server= <> \
+	--docker-username= <> \
+	--docker-password=<> \
+	--docker-email=<>
+
+(docker-registry is a built-in secret type)
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: private-registry.io/apps/internal-apps
+  imagePullSecrets:
+  - name: regcred
+```
+
+Docker and other system processes share the same **kernel** but they run in a different namespace such that docker has visibility of its own processes only.
+If we run **ps aux** from a container we can see a process of that container, but if we run **ps aux** from our linux terminal it will show the process of container with a **different process id**. Processes can have different IDs in different namespaces.
+
+By default, docker runs its processes using the **root** user.
+If you want to change the user for docker process:
+```
+docker run --user=<user id/name> ubuntu sleep 3600
+```
+
+This is a good **security practice** to limit the permissions of docker user.
+By default, if root user is being used, this root user won't be having complete access of our Linux system. As docker uses Linux capabilities to limit its permissions by default.
+
+We can see root user capabilities from:
+```
+/usr/include/linux/capability.h
+```
+
+If you want to limit or expand the capabilities of **root user** of docker:
+```
+docker run --cap-drop KILL ubuntu
+
+docker run --cap-add MAC_ADMIN ubuntu
+
+docker run --privileged ubuntu  (For all root user access to docker root)
+```
+
+We can set these **security contexts** at either pod level or container level. At **pod level**, these will be applied to all containers inside a pod.
+If we have added **security contexts** at both levels. Then **container level** contexts will override the pod level contexts.
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-pod
+spec:
+  containers:
+    - name: ubuntu
+      image: ubuntu
+      command: ["sleep", "3600"]
+      securityContext:
+        runAsUser: 1000
+        capabilities:
+          add: ["MAC_ADMIN"]
+```
