@@ -403,3 +403,72 @@ spec:
         capabilities:
           add: ["MAC_ADMIN"]
 ```
+
+Kubernetes is by default configured with **all allow** rule for traffic from any pod to any other service or pod in the cluster.
+
+We can provision **network policies** for each workload to allow/disallow traffic at different ports.
+
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: 
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: api-pod
+      namespaceSelector:   (this is to restrict pods of a particular namespace)
+        matchLabels:
+          name: prod
+    - ipBlock: (This is to allow an external IP access to certain pods)
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 3306
+
+
+We have two rules here. Rules within a rule like that of PodSelector and namespaceSelector work like AND operator. While the rules work like OR operator (either of the rule that works will allow traffic to flow.)
+```
+For isolation of Ingress and Egress, you will have to mention both in **policyTypes** in yaml file.
+
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: 
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: api-pod
+      namespaceSelector:
+        matchLabels:
+          name: prod
+    - ipBlock:
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 3306
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 80
+```
+
+___END SECURITY___
