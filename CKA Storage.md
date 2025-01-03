@@ -54,3 +54,97 @@ spec:
       fsType: ext4
 ```
 
+**Persistent Volume** is a cluster wide pool of storage volumes. Pods can claim volumes from this **PV** by using **Persistent Volume Claims (PVC)**.
+```
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /tmp/data
+  persistentVolumeReclaimPolicy: Retain/Delete/Recycle
+
+--------- FOR AWS -----------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1 Gi
+  awsElasticBlockStore:
+    volumeID: <volume-id>
+    fsType: ext4
+  persistentVolumeReclaimPolicy: Retain/Delete/Recycle
+```
+**Recycle** policy means that the data will be deleted before assigning PV to another PVC.
+
+Each **PVC** can be binded to only **one PV**. They have one to one relationship meaning that if a PVC is granted a larger PV than its need, then the remaining **PV** will remain unused and won't be given to any other PVC.
+
+We can use **Labels & Selectors** for specific binding of PVC with PV.
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500 Mi
+```
+
+**PVC** with **Pods**:
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+spec:
+  containers:
+  - name: event-simulator
+    image: kodekloud/event-simulator
+    env:
+    - name: LOG_HANDLERS
+      value: file
+    volumeMounts:
+    - mountPath: /log
+      name: log-volume
+
+  volumes:
+  - name: log-volume
+    persistentVolumeClaim:
+      claimName: claim-log-1
+```
+If the **Retain** policy PV by a PVC, then it is **NOT** made available to other **PVC**, it's state becomes **released**. To make it available again use policy **Recycle**.
+
+**Static Provisioning** of volume is manually creating a volume for every PV, while **Dynamic Provisioning** is to use a **storage class** for provisioning of volumes.
+
+![[Pasted image 20250103151044.png]]
+
+```
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: google-storage
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-standard
+  replication-type: none
+
+------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: delayed-volume-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
